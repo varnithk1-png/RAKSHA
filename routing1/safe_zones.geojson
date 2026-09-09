@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "description": "RAKSHA - Safe Zone / Shelter locations for the Hyderabad study area.",
+    "data_status": "SYNTHETIC / DEMO placeholder data for MVP development. Replace with Task 3 (GIS) team's verified, observed shelter dataset before final demo. Coordinates are approximate real-world landmarks used as stand-ins for actual designated shelters.",
+    "source": "Team-generated placeholder (Event Horizon / RAKSHA), for prototyping only"
+  },
+  "features": [
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.3772, 17.4436] }, "properties": { "shelter_id": "SZ001", "name": "Gachibowli Indoor Stadium Grounds", "capacity": 2000 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4744, 17.4040] }, "properties": { "shelter_id": "SZ002", "name": "LB Stadium Open Grounds", "capacity": 3000 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4737, 17.3937] }, "properties": { "shelter_id": "SZ003", "name": "Nizam College Grounds, Basheerbagh", "capacity": 1500 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.5288, 17.4136] }, "properties": { "shelter_id": "SZ004", "name": "Osmania University Grounds", "capacity": 2500 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4138, 17.4849] }, "properties": { "shelter_id": "SZ005", "name": "Kukatpally Housing Board Grounds", "capacity": 1800 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.5569, 17.4067] }, "properties": { "shelter_id": "SZ006", "name": "Rajiv Gandhi Intl Cricket Stadium Grounds, Uppal", "capacity": 4000 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.5010, 17.4460] }, "properties": { "shelter_id": "SZ007", "name": "Secunderabad Parade Grounds", "capacity": 3500 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4011, 17.3833] }, "properties": { "shelter_id": "SZ008", "name": "Golconda Fort Open Grounds", "capacity": 1200 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.3822, 17.4930] }, "properties": { "shelter_id": "SZ009", "name": "Miyapur Community Grounds", "capacity": 1000 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.5497, 17.3457] }, "properties": { "shelter_id": "SZ010", "name": "LB Nagar Community Hall Grounds", "capacity": 900 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4294, 17.2403] }, "properties": { "shelter_id": "SZ011", "name": "Shamshabad Open Grounds", "capacity": 1100 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4747, 17.3616] }, "properties": { "shelter_id": "SZ012", "name": "Charminar Open Square (Emergency Assembly Point)", "capacity": 800 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4879, 17.5464] }, "properties": { "shelter_id": "SZ013", "name": "Kompally Grounds", "capacity": 1300 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.4235, 17.3667] }, "properties": { "shelter_id": "SZ014", "name": "Attapur Community Ground", "capacity": 700 } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [78.5657, 17.4749] }, "properties": { "shelter_id": "SZ015", "name": "ECIL Grounds", "capacity": 1600 } }
+  ]
+}
