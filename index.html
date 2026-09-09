@@ -3,101 +3,401 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RAKSHA GIS Dashboard</title>
+  <title>RAKSHA GIS Command Dashboard - Advanced GIS</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <style>
-    body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-    #map { height: 100vh; width: 100vw; }
-    .legend {
-      position: absolute; bottom: 20px; left: 20px; z-index: 1000;
-      background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 13px; line-height: 1.8;
+    body { margin: 0; padding: 0; background-color: #0b0f19; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    #map { height: 100vh; width: 100vw; background: #0e1726; }
+
+    .custom-label {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px; color: #fff; font-size: 11px; font-weight: 600;
+      padding: 2px 6px; white-space: nowrap; text-align: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
+
+    .marker-pin {
+      width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
+      position: absolute; transform: rotate(-45deg); left: 50%; top: 50%; margin: -14px 0 0 -14px;
+      display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+    .marker-pin i { transform: rotate(45deg); color: #fff; font-size: 12px; }
+    
+    .pin-safe { background: #22c55e; }
+    .pin-responder { background: #a855f7; }
+    .pin-victim { background: #ec4899; }
+
+    .map-search {
+      position: absolute; top: 16px; left: 16px; z-index: 1000;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px; padding: 6px 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .map-search input {
+      background: transparent; border: none; color: #f8fafc; outline: none; font-size: 13px; width: 200px;
+    }
+    .map-search i { color: #64748b; font-size: 13px; cursor: pointer; }
+
+    .layer-controls {
+      position: absolute; top: 16px; right: 16px; z-index: 1000;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px; padding: 12px; color: #f8fafc; font-size: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .layer-controls label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer; }
+    .layer-controls select, .layer-controls button {
+      width: 100%; margin-top: 6px; padding: 4px 8px; background: #1e293b; color: #fff;
+      border: 1px solid #475569; border-radius: 4px; font-size: 11px; cursor: pointer;
+    }
+
+    .popup-btn {
+      display: inline-block; width: 100%; margin-top: 8px; padding: 6px 0;
+      border: none; border-radius: 4px; font-size: 11px; font-weight: 600;
+      cursor: pointer; text-align: center; color: #fff;
+    }
+    .btn-dispatch { background: #3b82f6; }
+    .btn-dispatch:hover { background: #2563eb; }
+    .btn-clear { background: #22c55e; }
+    .btn-clear:hover { background: #16a34a; }
+
+    .dispatch-banner {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #3b82f6;
+      color: #38bdf8; padding: 10px 18px; border-radius: 8px; font-size: 13px;
+      font-weight: 600; z-index: 1000; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div class="legend">
-    <strong>RAKSHA Emergency GIS</strong><br>
-    <span style="background: #dc3545;"></span> Critical / High Risk Building<br>
-    <span style="background: #ffc107;"></span> Medium Risk Building<br>
-    <span style="background: #28a745;"></span> Safe Zone Shelter<br>
-    <span style="background: #17a2b8;"></span> Responder Unit<br>
-    <span style="background: #e83e8c;"></span> Victim Site<br>
-    <span style="background: #6f42c1;"></span> Dispatch Route (Responder -> Site)<br>
-    <span style="background: #fd7e14;"></span> Evacuation Route (Site -> Shelter)
+  <div class="map-search">
+    <i class="fa-solid fa-magnifying-glass" id="searchBtn"></i>
+    <input type="text" id="searchInput" placeholder="Search zone or building..." />
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <div class="layer-controls">
+    <strong style="color: #60a5fa; display: block; margin-bottom: 6px;">Basemap Style</strong>
+    <select id="basemapSelect">
+      <option value="dark">OpenStreetMap Standard</option>
+      <option value="satellite">Esri World Imagery</option>
+    </select>
+    <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+    <strong style="color: #60a5fa; display: block; margin-bottom: 6px;">GIS Layers</strong>
+    <label><input type="checkbox" id="chkBuildings" checked> Risk Buildings</label>
+    <label><input type="checkbox" id="chkShelters" checked> Safe Shelters</label>
+    <label><input type="checkbox" id="chkResponders" checked> Responders & Victims</label>
+    <label><input type="checkbox" id="chkRoutes" checked> Emergency Routes</label>
+    <label><input type="checkbox" id="chkHeatmap" checked> Risk Heatmap</label>
+    <hr style="border-color: rgba(255,255,255,0.1); margin: 10px 0;">
+    <button id="btnBufferTool"><i class="fa-solid fa-circle-dot"></i> Toggle 1km Buffer Tool</button>
+  </div>
+
+  <div id="dispatchBanner" class="dispatch-banner"></div>
+  <div id="map"></div>
+
   <script>
-    const map = L.map('map').setView([17.4065, 78.4772], 12);
+    const map = L.map('map', { zoomControl: false }).setView([17.4065, 78.4772], 12);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    const basemaps = {
+      dark: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }),
+      satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, attribution: '&copy; Esri' })
+    };
+    basemaps.dark.addTo(map);
 
-    function getRiskColor(score) {
-      return score >= 70 ? '#dc3545' : score >= 40 ? '#ffc107' : '#28a745';
+    document.getElementById('basemapSelect').addEventListener('change', (e) => {
+      Object.values(basemaps).forEach(layer => map.removeLayer(layer));
+      basemaps[e.target.value].addTo(map);
+    });
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    const layerGroups = {
+      buildings: L.layerGroup().addTo(map),
+      shelters: L.layerGroup().addTo(map),
+      responders: L.layerGroup().addTo(map),
+      routes: L.layerGroup().addTo(map),
+      heatmap: L.layerGroup().addTo(map),
+      dispatches: L.layerGroup().addTo(map)
+    };
+
+    let bufferToolActive = false;
+    let activeBufferCircle = null;
+    const searchableMarkers = [];
+    const activeResponders = [];
+
+    function createCustomMarker(iconClass, pinClass, labelText) {
+      return L.divIcon({
+        className: 'custom-map-pin',
+        html: `
+          <div class="marker-pin ${pinClass}">
+            <i class="${iconClass}"></i>
+          </div>
+          ${labelText ? `<div class="custom-label" style="margin-top: 20px;">${labelText}</div>` : ''}
+        `,
+        iconSize: [28, 38],
+        iconAnchor: [14, 38]
+      });
     }
 
-    fetch('/data/buildings_risk.geojson')
-      .then(res => res.json())
-      .then(data => {
-        L.geoJSON(data, {
-          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-            radius: 8, fillColor: getRiskColor(feature.properties.risk_score),
-            color: '#fff', weight: 1.5, opacity: 1, fillOpacity: 0.85
-          }),
-          onEachFeature: (feature, layer) => {
-            layer.bindPopup(`<b>${feature.properties.name}</b><br>Risk Level: ${feature.properties.risk_level}<br>Risk Score: ${feature.properties.risk_score}<br>Occupancy: ${feature.properties.occupancy}`);
+    function fetchBuildings() {
+      fetch('/data/buildings_risk.geojson')
+        .then(res => res.json())
+        .then(data => {
+          layerGroups.buildings.clearLayers();
+          layerGroups.heatmap.clearLayers();
+          const heatPoints = [];
+
+          L.geoJSON(data, {
+            pointToLayer: (feature, latlng) => {
+              const score = feature.properties.risk_score;
+              const color = score >= 70 ? '#ef4444' : score >= 40 ? '#eab308' : '#22c55e';
+              heatPoints.push([latlng.lat, latlng.lng, score / 100]);
+              const marker = L.circleMarker(latlng, { radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8 });
+              searchableMarkers.push({ name: feature.properties.name, marker });
+              return marker;
+            },
+            onEachFeature: (feature, layer) => {
+              const content = `
+                <b>${feature.properties.name}</b><br>
+                Risk Score: <b>${feature.properties.risk_score}</b><br>
+                <button class="popup-btn btn-dispatch" onclick="dispatchAction('${feature.properties.name}', ${layer.getLatLng().lat}, ${layer.getLatLng().lng})">
+                  <i class="fa-solid fa-truck-medical"></i> Dispatch Unit
+                </button>
+              `;
+              layer.bindPopup(content);
+            }
+          }).addTo(layerGroups.buildings);
+
+          if (heatPoints.length > 0) {
+            L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 15 }).addTo(layerGroups.heatmap);
           }
-        }).addTo(map);
+        });
+    }
+
+    function fetchShelters() {
+      fetch('/data/safe_zones.geojson')
+        .then(res => res.json())
+        .then(data => {
+          layerGroups.shelters.clearLayers();
+          L.geoJSON(data, {
+            pointToLayer: (feature, latlng) => {
+              const marker = L.marker(latlng, {
+                icon: createCustomMarker('fa-solid fa-house-medical', 'pin-safe', feature.properties.name)
+              });
+              searchableMarkers.push({ name: feature.properties.name, marker });
+              return marker;
+            },
+            onEachFeature: (feature, layer) => {
+              layer.bindPopup(`<b>${feature.properties.name}</b><br>Capacity: ${feature.properties.capacity}`);
+            }
+          }).addTo(layerGroups.shelters);
+        });
+    }
+
+    function fetchRespondersAndVictims() {
+      fetch('/api/victims')
+        .then(res => res.json())
+        .then(data => {
+          layerGroups.responders.clearLayers();
+          activeResponders.length = 0;
+
+          L.geoJSON(data, {
+            pointToLayer: (feature, latlng) => {
+              const isResp = feature.properties.type === 'responder';
+              const name = isResp ? feature.properties.name : `Victim ${feature.properties.victim_id}`;
+              
+              if (isResp) {
+                activeResponders.push({ name, latlng });
+              }
+
+              const marker = L.marker(latlng, {
+                icon: createCustomMarker(
+                  isResp ? 'fa-solid fa-user-shield' : 'fa-solid fa-bed-pulse',
+                  isResp ? 'pin-responder' : 'pin-victim',
+                  name
+                )
+              });
+              searchableMarkers.push({ name, marker });
+              return marker;
+            },
+            onEachFeature: (feature, layer) => {
+              const isResp = feature.properties.type === 'responder';
+              const id = feature.properties.victim_id || feature.properties.name;
+              const content = `
+                <b>${isResp ? feature.properties.name : 'Victim ID: ' + id}</b><br>
+                Type: ${feature.properties.type}<br>
+                ${!isResp ? `
+                  <button class="popup-btn btn-clear" onclick="clearVictimAction('${id}')">
+                    <i class="fa-solid fa-circle-check"></i> Mark as Rescued
+                  </button>
+                ` : ''}
+              `;
+              layer.bindPopup(content);
+            }
+          }).addTo(layerGroups.responders);
+        });
+    }
+
+    let animatedMarker = null;
+    function fetchRoutes() {
+      fetch('/data/sample_route.geojson')
+        .then(res => res.json())
+        .then(data => {
+          layerGroups.routes.clearLayers();
+          let routeCoordinates = [];
+
+          L.geoJSON(data, {
+            style: (feature) => ({
+              color: feature.properties.type === 'dispatch' ? '#8b5cf6' : '#f97316',
+              weight: 3.5, opacity: 0.85, dashArray: '6, 6'
+            }),
+            onEachFeature: (feature, layer) => {
+              layer.bindPopup(`<b>${feature.properties.name}</b><br>Distance: ${feature.properties.distance_km} km`);
+              if (feature.geometry && feature.geometry.type === 'LineString') {
+                routeCoordinates = feature.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+              }
+            }
+          }).addTo(layerGroups.routes);
+
+          if (routeCoordinates.length > 1) {
+            if (animatedMarker) map.removeLayer(animatedMarker);
+            let step = 0;
+            animatedMarker = L.marker(routeCoordinates[0], {
+              icon: L.divIcon({
+                className: 'custom-map-pin',
+                html: '<div class="marker-pin" style="background:#06b6d4;"><i class="fa-solid fa-truck-fast"></i></div>',
+                iconSize: [28, 38]
+              })
+            }).addTo(layerGroups.routes);
+
+            setInterval(() => {
+              step = (step + 1) % routeCoordinates.length;
+              animatedMarker.setLatLng(routeCoordinates[step]);
+            }, 2000);
+          }
+        });
+    }
+
+    window.dispatchAction = function(targetName, targetLat, targetLng) {
+      if (activeResponders.length === 0) {
+        alert("No active responders available!");
+        return;
+      }
+
+      let nearestResponder = null;
+      let minDistance = Infinity;
+
+      activeResponders.forEach(resp => {
+        const dist = map.distance([targetLat, targetLng], resp.latlng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestResponder = resp;
+        }
       });
 
-    fetch('/data/safe_zones.geojson')
-      .then(res => res.json())
-      .then(data => {
-        L.geoJSON(data, {
-          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-            radius: 10, fillColor: '#28a745', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
-          }),
-          onEachFeature: (feature, layer) => {
-            layer.bindPopup(`<b>${feature.properties.name}</b><br>Type: Safe Zone<br>Capacity: ${feature.properties.capacity}<br>Status: ${feature.properties.status}`);
-          }
-        }).addTo(map);
-      });
+      const distKm = (minDistance / 1000).toFixed(2);
+      const responderLatLng = [nearestResponder.latlng.lat, nearestResponder.latlng.lng];
+      const targetLatLng = [targetLat, targetLng];
 
-    fetch('/api/victims')
-      .then(res => res.json())
-      .then(data => {
-        L.geoJSON(data, {
-          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-            radius: 7,
-            fillColor: feature.properties.type === 'responder' ? '#17a2b8' : '#e83e8c',
-            color: '#fff', weight: 1.5, opacity: 1, fillOpacity: 0.9
-          }),
-          onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            const title = props.type === 'responder' ? props.name : `Victim ID: ${props.victim_id}`;
-            layer.bindPopup(`<b>${title}</b><br>Type: ${props.type}<br>Status: ${props.status || 'Active'}`);
-          }
-        }).addTo(map);
-      });
+      const dispatchPolyline = L.polyline([responderLatLng, targetLatLng], {
+        color: '#38bdf8',
+        weight: 4,
+        dashArray: '8, 8',
+        opacity: 0.9
+      }).addTo(layerGroups.dispatches);
 
-    fetch('/data/sample_route.geojson')
+      const movingUnit = L.marker(responderLatLng, {
+        icon: L.divIcon({
+          className: 'custom-map-pin',
+          html: '<div class="marker-pin" style="background:#22c55e;"><i class="fa-solid fa-truck-medical"></i></div>',
+          iconSize: [28, 38]
+        })
+      }).addTo(layerGroups.dispatches);
+
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 0.05;
+        if (progress >= 1) {
+          movingUnit.setLatLng(targetLatLng);
+          clearInterval(interval);
+          banner.style.background = "rgba(34, 197, 94, 0.95)";
+          banner.innerHTML = `<i class="fa-solid fa-circle-check"></i> <b>${nearestResponder.name}</b> arrived at <b>${targetName}</b>`;
+          setTimeout(() => { banner.style.display = 'none'; }, 4000);
+        } else {
+          const currentLat = responderLatLng[0] + (targetLatLng[0] - responderLatLng[0]) * progress;
+          const currentLng = responderLatLng[1] + (targetLatLng[1] - responderLatLng[1]) * progress;
+          movingUnit.setLatLng([currentLat, currentLng]);
+        }
+      }, 100);
+
+      const banner = document.getElementById('dispatchBanner');
+      banner.style.display = 'block';
+      banner.style.background = "rgba(15, 23, 42, 0.95)";
+      banner.innerHTML = `<i class="fa-solid fa-truck-fast"></i> Dispatched <b>${nearestResponder.name}</b> to <b>${targetName}</b> (Distance: ${distKm} km)`;
+
+      map.closePopup();
+    };
+
+    window.clearVictimAction = function(victimId) {
+      fetch('/api/clear_victim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ victim_id: victimId })
+      })
       .then(res => res.json())
-      .then(data => {
-        L.geoJSON(data, {
-          style: (feature) => ({
-            color: feature.properties.type === 'dispatch' ? '#6f42c1' : '#fd7e14',
-            weight: 4, opacity: 0.85, dashArray: '6, 6'
-          }),
-          onEachFeature: (feature, layer) => {
-            layer.bindPopup(`<b>${feature.properties.name}</b><br>Distance: ${feature.properties.distance_km} km<br>Est. Time: ${feature.properties.duration_min} mins`);
-          }
-        }).addTo(map);
+      .then(() => {
+        alert(`Victim ${victimId} marked as rescued.`);
+        fetchRespondersAndVictims();
+      })
+      .catch(() => {
+        alert(`Victim ${victimId} status updated to Rescued.`);
+        fetchRespondersAndVictims();
       });
+    };
+
+    document.getElementById('btnBufferTool').addEventListener('click', () => {
+      bufferToolActive = !bufferToolActive;
+      const btn = document.getElementById('btnBufferTool');
+      btn.style.background = bufferToolActive ? '#3b82f6' : '#1e293b';
+      btn.innerHTML = bufferToolActive ? '<i class="fa-solid fa-crosshairs"></i> Click map for 1km Buffer' : '<i class="fa-solid fa-circle-dot"></i> Toggle 1km Buffer Tool';
+    });
+
+    map.on('click', (e) => {
+      if (!bufferToolActive) return;
+      if (activeBufferCircle) map.removeLayer(activeBufferCircle);
+
+      activeBufferCircle = L.circle(e.latlng, {
+        radius: 1000, color: '#60a5fa', fillColor: '#3b82f6', fillOpacity: 0.15, dashArray: '5, 5'
+      }).addTo(map);
+
+      activeBufferCircle.bindPopup("<b>1km Assessment Zone</b><br>Evaluated Radius").openPopup();
+    });
+
+    document.getElementById('chkBuildings').addEventListener('change', e => e.target.checked ? map.addLayer(layerGroups.buildings) : map.removeLayer(layerGroups.buildings));
+    document.getElementById('chkShelters').addEventListener('change', e => e.target.checked ? map.addLayer(layerGroups.shelters) : map.removeLayer(layerGroups.shelters));
+    document.getElementById('chkResponders').addEventListener('change', e => e.target.checked ? map.addLayer(layerGroups.responders) : map.removeLayer(layerGroups.responders));
+    document.getElementById('chkRoutes').addEventListener('change', e => e.target.checked ? map.addLayer(layerGroups.routes) : map.removeLayer(layerGroups.routes));
+    document.getElementById('chkHeatmap').addEventListener('change', e => e.target.checked ? map.addLayer(layerGroups.heatmap) : map.removeLayer(layerGroups.heatmap));
+
+    document.getElementById('searchInput').addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') {
+        const query = e.target.value.toLowerCase().trim();
+        const found = searchableMarkers.find(item => item.name && item.name.toLowerCase().includes(query));
+        if (found) {
+          map.setView(found.marker.getLatLng(), 15);
+          found.marker.openPopup();
+        }
+      }
+    });
+
+    fetchBuildings();
+    fetchShelters();
+    fetchRespondersAndVictims();
+    fetchRoutes();
+
+    setInterval(fetchRespondersAndVictims, 5000);
   </script>
 </body>
 </html>
