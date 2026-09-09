@@ -1,0 +1,7 @@
+buildings_hyderabad.geojson.state
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/buildings_hyderabad.geojson

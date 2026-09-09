@@ -1,0 +1,5 @@
+building_id,vulnerability,seismic_hazard,population_exposure,accessibilty
+B001,70,80,60,40
+B002,30,50,90,70
+B003,90,75,80,30
+B004,20,30,25,90
