@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAKSHA GIS Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    #map { height: 100vh; width: 100vw; }
+    .legend {
+      position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+      background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 13px; line-height: 1.8;
+    }
+    .legend span { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="legend">
+    <strong>RAKSHA Emergency GIS</strong><br>
+    <span style="background: #dc3545;"></span> Critical / High Risk Building<br>
+    <span style="background: #ffc107;"></span> Medium Risk Building<br>
+    <span style="background: #28a745;"></span> Safe Zone Shelter<br>
+    <span style="background: #17a2b8;"></span> Responder Unit<br>
+    <span style="background: #e83e8c;"></span> Victim Site<br>
+    <span style="background: #6f42c1;"></span> Dispatch Route (Responder -> Site)<br>
+    <span style="background: #fd7e14;"></span> Evacuation Route (Site -> Shelter)
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([17.4065, 78.4772], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    function getRiskColor(score) {
+      return score >= 70 ? '#dc3545' : score >= 40 ? '#ffc107' : '#28a745';
+    }
+
+    fetch('/data/buildings_risk.geojson')
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+            radius: 8, fillColor: getRiskColor(feature.properties.risk_score),
+            color: '#fff', weight: 1.5, opacity: 1, fillOpacity: 0.85
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(`<b>${feature.properties.name}</b><br>Risk Level: ${feature.properties.risk_level}<br>Risk Score: ${feature.properties.risk_score}<br>Occupancy: ${feature.properties.occupancy}`);
+          }
+        }).addTo(map);
+      });
+
+    fetch('/data/safe_zones.geojson')
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+            radius: 10, fillColor: '#28a745', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(`<b>${feature.properties.name}</b><br>Type: Safe Zone<br>Capacity: ${feature.properties.capacity}<br>Status: ${feature.properties.status}`);
+          }
+        }).addTo(map);
+      });
+
+    fetch('/api/victims')
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+            radius: 7,
+            fillColor: feature.properties.type === 'responder' ? '#17a2b8' : '#e83e8c',
+            color: '#fff', weight: 1.5, opacity: 1, fillOpacity: 0.9
+          }),
+          onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            const title = props.type === 'responder' ? props.name : `Victim ID: ${props.victim_id}`;
+            layer.bindPopup(`<b>${title}</b><br>Type: ${props.type}<br>Status: ${props.status || 'Active'}`);
+          }
+        }).addTo(map);
+      });
+
+    fetch('/data/sample_route.geojson')
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          style: (feature) => ({
+            color: feature.properties.type === 'dispatch' ? '#6f42c1' : '#fd7e14',
+            weight: 4, opacity: 0.85, dashArray: '6, 6'
+          }),
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(`<b>${feature.properties.name}</b><br>Distance: ${feature.properties.distance_km} km<br>Est. Time: ${feature.properties.duration_min} mins`);
+          }
+        }).addTo(map);
+      });
+  </script>
+</body>
+</html>
