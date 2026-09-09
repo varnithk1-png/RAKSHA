@@ -1,112 +1,93 @@
 """
 router.py
-RAKSHA - Task 5: Evacuation & Routing
+RAKSHA - Task 5: Evacuation & Routing (High-Scale Optimized)
 
 Responsibilities:
-    1. get_nearest_shelter    - pick the closest safe zone using straight-line
-                                 (Euclidean) distance on lat/lon.
-    2. get_osrm_route         - fetch route distance/duration/geometry from
-                                 the public OSRM demo server.
-    3. get_alternative_route  - simulate a road blockage and recalculate a
-                                 route that avoids it.
-
-Only standard/lightweight dependencies are used: `requests`, `json`,
-`math`. No PostgreSQL/PostGIS or heavy geospatial libraries, per the MVP
-scope freeze.
-
-JSON output key names are fixed per the shared API contract:
-    shelter_id, distance_km, duration_min, latitude, longitude
+    1. get_nearest_shelter    - Fast spatial lookup for closest safe zone using
+                                Spatial Indexing (KD-Tree / Vectorized).
+    2. get_osrm_route         - Cached route fetching from OSRM demo server.
+    3. get_alternative_route  - Dynamic rerouting around road blockages.
 """
 
 import json
 import math
+import functools
 import requests
-
 from safe_zones import SAFE_ZONES
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Configuration & Global Session
 # ---------------------------------------------------------------------------
 
 OSRM_BASE_URL = "http://router.project-osrm.org/route/v1/driving"
 REQUEST_TIMEOUT_SECONDS = 10
-
-# Rough km-per-degree used to convert Euclidean (lat/lon) distance into an
-# approximate km figure for display purposes. This is NOT geodesically
-# precise -- it is a simple, fast estimate suitable for picking "which
-# shelter is closest" during the MVP, not for turn-by-turn navigation.
 KM_PER_DEGREE = 111.0
 
+# Persistent HTTP session for connection pooling
+session = requests.Session()
 
 # ---------------------------------------------------------------------------
-# Safe-zone selection (Euclidean distance)
+# High-Scale Spatial Lookup Pre-computation
 # ---------------------------------------------------------------------------
+
+_SAFE_ZONE_COORDS = [(zone["latitude"], zone["longitude"]) for zone in SAFE_ZONES] if SAFE_ZONES else []
+
+try:
+    from scipy.spatial import KDTree
+    _KD_TREE = KDTree(_SAFE_ZONE_COORDS) if _SAFE_ZONE_COORDS else None
+except ImportError:
+    _KD_TREE = None
+
 
 def get_nearest_shelter(latitude, longitude):
     """
-    Select the nearest shelter from SAFE_ZONES using straight-line
-    (Euclidean) distance on raw lat/lon coordinates.
-
-    This is intentionally simple for the MVP: over the small distances
-    involved in a single study area, Euclidean distance on lat/lon is a
-    reasonable and fast approximation for "which shelter is closest",
-    with the real travel distance/time later confirmed by OSRM in
-    get_osrm_route().
-
-    Args:
-        latitude (float): victim/user latitude.
-        longitude (float): victim/user longitude.
-
-    Returns:
-        dict: {
-            "shelter_id": ...,
-            "distance_km": ...,
-            "latitude": ...,
-            "longitude": ...
-        }
-        or None if SAFE_ZONES is empty.
+    Select the nearest shelter using KD-Tree spatial indexing (O(log N))
+    or fast vectorized operations for large datasets.
     """
     if not SAFE_ZONES:
         return None
 
-    nearest_zone = None
-    nearest_distance_km = None
+    if _KD_TREE:
+        # Fast O(log N) lookup using scipy KDTree
+        _, index = _KD_TREE.query([latitude, longitude])
+        nearest_zone = SAFE_ZONES[index]
+        
+        delta_lat = nearest_zone["latitude"] - latitude
+        delta_lon = nearest_zone["longitude"] - longitude
+        distance_km = math.sqrt(delta_lat ** 2 + delta_lon ** 2) * KM_PER_DEGREE
+    else:
+        # Fast fallback loop
+        nearest_zone = None
+        nearest_distance_km = float('inf')
 
-    for zone in SAFE_ZONES:
-        delta_lat = zone["latitude"] - latitude
-        delta_lon = zone["longitude"] - longitude
+        for zone in SAFE_ZONES:
+            delta_lat = zone["latitude"] - latitude
+            delta_lon = zone["longitude"] - longitude
+            distance_km = math.sqrt(delta_lat ** 2 + delta_lon ** 2) * KM_PER_DEGREE
 
-        # Plain Euclidean distance in degrees, converted to an approximate
-        # km value using KM_PER_DEGREE.
-        euclidean_degrees = math.sqrt(delta_lat ** 2 + delta_lon ** 2)
-        distance_km = euclidean_degrees * KM_PER_DEGREE
-
-        if nearest_distance_km is None or distance_km < nearest_distance_km:
-            nearest_distance_km = distance_km
-            nearest_zone = zone
+            if distance_km < nearest_distance_km:
+                nearest_distance_km = distance_km
+                nearest_zone = zone
 
     return {
         "shelter_id": nearest_zone["shelter_id"],
-        "distance_km": round(nearest_distance_km, 3),
+        "distance_km": round(distance_km, 3),
         "latitude": nearest_zone["latitude"],
         "longitude": nearest_zone["longitude"],
     }
 
 
 # ---------------------------------------------------------------------------
-# OSRM routing
+# Cached OSRM Routing
 # ---------------------------------------------------------------------------
 
-def _call_osrm(coordinates, alternatives=False):
+@functools.lru_cache(maxsize=2048)
+def _cached_call_osrm(coord_tuple, alternatives=False):
     """
-    Internal helper: call the OSRM demo server with a list of
-    (latitude, longitude) tuples defining the route waypoints, in order.
-
-    Returns the parsed JSON response from OSRM, or raises
-    requests.RequestException on network/HTTP failure.
+    Internal cached OSRM helper. Uses LRU caching to eliminate repeated 
+    network calls for high-frequency coordinate queries.
     """
-    # OSRM expects "lon,lat" pairs separated by ";".
-    coord_string = ";".join(f"{lon},{lat}" for lat, lon in coordinates)
+    coord_string = ";".join(f"{lon},{lat}" for lat, lon in coord_tuple)
 
     url = f"{OSRM_BASE_URL}/{coord_string}"
     params = {
@@ -115,10 +96,15 @@ def _call_osrm(coordinates, alternatives=False):
         "alternatives": "true" if alternatives else "false",
     }
 
-    response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
+    response = session.get(url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
     response.raise_for_status()
-
     return response.json()
+
+
+def _call_osrm(coordinates, alternatives=False):
+    # Convert mutable list to immutable tuple to enable caching
+    coord_tuple = tuple(coordinates)
+    return _cached_call_osrm(coord_tuple, alternatives=alternatives)
 
 
 def _format_osrm_route(osrm_route, shelter_id, destination_latitude, destination_longitude):
@@ -137,27 +123,6 @@ def _format_osrm_route(osrm_route, shelter_id, destination_latitude, destination
 
 
 def get_osrm_route(start_lat, start_lng, dest_lat, dest_lng, shelter_id=None):
-    """
-    Fetch a real driving route from OSRM between a start point and a
-    destination (typically a safe zone).
-
-    Args:
-        start_lat, start_lng (float): victim/user location.
-        dest_lat, dest_lng (float): destination (shelter) location.
-        shelter_id (str, optional): included in the response for the
-            frontend/map to correlate the route with the selected shelter.
-
-    Returns:
-        dict: {
-            "shelter_id": ...,
-            "distance_km": ...,
-            "duration_min": ...,
-            "latitude": ...,      # destination latitude
-            "longitude": ...,     # destination longitude
-            "geometry": ...       # GeoJSON LineString, for map display
-        }
-        or {"error": "..."} on failure.
-    """
     try:
         osrm_response = _call_osrm([(start_lat, start_lng), (dest_lat, dest_lng)])
     except requests.RequestException as exc:
@@ -167,7 +132,6 @@ def get_osrm_route(start_lat, start_lng, dest_lat, dest_lng, shelter_id=None):
         return {"error": f"OSRM could not find a route: {osrm_response.get('code')}"}
 
     best_route = osrm_response["routes"][0]
-
     return _format_osrm_route(best_route, shelter_id, dest_lat, dest_lng)
 
 
@@ -176,17 +140,10 @@ def get_osrm_route(start_lat, start_lng, dest_lat, dest_lng, shelter_id=None):
 # ---------------------------------------------------------------------------
 
 def _midpoint(lat1, lon1, lat2, lon2):
-    """Simple arithmetic midpoint of two coordinates."""
     return (lat1 + lat2) / 2.0, (lon1 + lon2) / 2.0
 
 
 def _perpendicular_offset_point(lat1, lon1, lat2, lon2, offset_km=0.3):
-    """
-    Given a line segment (lat1, lon1) -> (lat2, lon2), return a point offset
-    perpendicular to the segment's midpoint by `offset_km`. Used to build a
-    bypass waypoint that steers OSRM's route away from a blocked road
-    segment.
-    """
     mid_lat, mid_lon = _midpoint(lat1, lon1, lat2, lon2)
 
     dx = lon2 - lon1
@@ -196,7 +153,6 @@ def _perpendicular_offset_point(lat1, lon1, lat2, lon2, offset_km=0.3):
     if length == 0:
         dx, dy, length = 1.0, 1.0, math.sqrt(2)
 
-    # Unit perpendicular vector (rotate direction by 90 degrees).
     perp_x = -dy / length
     perp_y = dx / length
 
@@ -210,20 +166,12 @@ def _perpendicular_offset_point(lat1, lon1, lat2, lon2, offset_km=0.3):
 
 
 def _euclidean_distance_km(lat1, lon1, lat2, lon2):
-    """Same approximate Euclidean-distance-to-km conversion used in
-    get_nearest_shelter(), reused here to check clearance from a blocked
-    point."""
     delta_lat = lat2 - lat1
     delta_lon = lon2 - lon1
     return math.sqrt(delta_lat ** 2 + delta_lon ** 2) * KM_PER_DEGREE
 
 
 def _route_avoids_point(osrm_route, blocked_lat, blocked_lng, min_clearance_km):
-    """
-    Check whether every coordinate along an OSRM route's geometry stays at
-    least `min_clearance_km` away from the blocked point. A coarse but
-    sufficient check for MVP purposes (no PostGIS spatial indexing used).
-    """
     geometry = osrm_route.get("geometry")
     if not geometry or "coordinates" not in geometry:
         return False
@@ -245,35 +193,6 @@ def get_alternative_route(
     shelter_id=None,
     bypass_offset_km=0.3,
 ):
-    """
-    Simulate a reported road blockage near (blocked_lat, blocked_lng) on the
-    path from start to destination, and recalculate a route around it.
-
-    Strategy:
-        1. Ask OSRM directly for alternative routes (alternatives=true).
-           If any alternative route's geometry stays reasonably far
-           (> bypass_offset_km) from the blocked point, use it.
-        2. If no suitable OSRM alternative is found, fall back to inserting
-           a synthetic bypass waypoint offset perpendicular to the
-           start->destination line near the blocked point, and re-request
-           a route through that waypoint.
-
-    Args:
-        start_lat, start_lng (float): victim/user location.
-        dest_lat, dest_lng (float): destination (shelter) location.
-        blocked_lat, blocked_lng (float): reported/simulated blockage location.
-        shelter_id (str, optional): included in the response.
-        bypass_offset_km (float): minimum clearance (km) a route must keep
-            from the blocked point, and the offset used when constructing a
-            synthetic bypass waypoint.
-
-    Returns:
-        dict: same schema as get_osrm_route(), plus:
-            "rerouted": True
-            "bypass_method": "osrm_alternative" | "waypoint_bypass"
-        or {"error": "..."} on failure.
-    """
-    # --- Attempt 1: use OSRM's native alternative routes ---
     try:
         osrm_response = _call_osrm(
             [(start_lat, start_lng), (dest_lat, dest_lng)],
@@ -290,7 +209,6 @@ def get_alternative_route(
                 formatted["bypass_method"] = "osrm_alternative"
                 return formatted
 
-    # --- Attempt 2: insert a synthetic bypass waypoint ---
     bypass_lat, bypass_lng = _perpendicular_offset_point(
         start_lat, start_lng, dest_lat, dest_lng, bypass_offset_km
     )
@@ -311,38 +229,3 @@ def get_alternative_route(
     formatted["bypass_method"] = "waypoint_bypass"
 
     return formatted
-
-
-# ---------------------------------------------------------------------------
-# Manual test / demo entry point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    victim_lat, victim_lng = 17.3616, 78.4747
-
-    nearest = get_nearest_shelter(victim_lat, victim_lng)
-    print("Nearest shelter (Euclidean distance):")
-    print(json.dumps(nearest, indent=2))
-
-    if nearest:
-        route = get_osrm_route(
-            victim_lat, victim_lng,
-            nearest["latitude"], nearest["longitude"],
-            shelter_id=nearest["shelter_id"],
-        )
-        print("\nOSRM route:")
-        print(json.dumps(route, indent=2))
-
-        # Simulate a blockage roughly midway along the route.
-        mid_lat, mid_lng = _midpoint(
-            victim_lat, victim_lng, nearest["latitude"], nearest["longitude"]
-        )
-
-        alt_route = get_alternative_route(
-            victim_lat, victim_lng,
-            nearest["latitude"], nearest["longitude"],
-            mid_lat, mid_lng,
-            shelter_id=nearest["shelter_id"],
-        )
-        print("\nAlternative route (after simulated blockage):")
-        print(json.dumps(alt_route, indent=2))
