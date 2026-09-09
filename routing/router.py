@@ -13,7 +13,7 @@ import json
 import math
 import functools
 import requests
-from safe_zones import SAFE_ZONES
+from routing.safe_zones import SAFE_ZONES
 
 # ---------------------------------------------------------------------------
 # Configuration & Global Session
