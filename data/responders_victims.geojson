@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4867, 17.3850] },
+      "properties": {
+        "type": "victim",
+        "building_id": "BLD_001",
+        "latitude": 17.3850,
+        "longitude": 78.4867
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4890, 17.3870] },
+      "properties": {
+        "type": "responder",
+        "responder_id": "UNIT_07",
+        "latitude": 17.3870,
+        "longitude": 78.4890
+      }
+    }
+  ]
+}

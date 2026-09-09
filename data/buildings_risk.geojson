@@ -1,0 +1,38 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4867, 17.3850] },
+      "properties": {
+        "building_id": "BLD_001",
+        "risk_score": 85,
+        "risk_level": "Critical",
+        "latitude": 17.3850,
+        "longitude": 78.4867
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4875, 17.3860] },
+      "properties": {
+        "building_id": "BLD_002",
+        "risk_score": 62,
+        "risk_level": "High",
+        "latitude": 17.3860,
+        "longitude": 78.4875
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4880, 17.3840] },
+      "properties": {
+        "building_id": "BLD_003",
+        "risk_score": 40,
+        "risk_level": "Medium",
+        "latitude": 17.3840,
+        "longitude": 78.4880
+      }
+    }
+  ]
+}

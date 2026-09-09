@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4900, 17.3880] },
+      "properties": {
+        "shelter_id": "SHELTER_001",
+        "name": "Community Hall Safe Zone",
+        "latitude": 17.3880,
+        "longitude": 78.4900,
+        "capacity": 500
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [78.4820, 17.3810] },
+      "properties": {
+        "shelter_id": "SHELTER_002",
+        "name": "School Stadium Safe Zone",
+        "latitude": 17.3810,
+        "longitude": 78.4820,
+        "capacity": 1000
+      }
+    }
+  ]
+}
