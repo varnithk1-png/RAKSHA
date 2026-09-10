@@ -4,15 +4,7 @@ function AssistancePanel() {
   const [message, setMessage] = useState("");
 
   function sendWhatsApp() {
-    setMessage(
-      "WhatsApp assistance request initiated."
-    );
-  }
-
-  function sendSOS() {
-    setMessage(
-      "🚨 SOS request sent successfully."
-    );
+    setMessage("WhatsApp assistance request initiated.");
   }
 
   return (
@@ -30,13 +22,6 @@ function AssistancePanel() {
           onClick={sendWhatsApp}
         >
           💬 WhatsApp
-        </button>
-
-        <button
-          className="sos-button"
-          onClick={sendSOS}
-        >
-          🚨 SOS
         </button>
 
       </div>

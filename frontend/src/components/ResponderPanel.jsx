@@ -14,7 +14,7 @@ function ResponderPanel() {
         {responders.map((responder) => (
           <div
             className="responder-item"
-            key={responder.id}
+            key={responder.responder_id}
           >
 
             <div className="responder-avatar">
@@ -23,7 +23,7 @@ function ResponderPanel() {
 
             <div className="responder-info">
               <strong>{responder.name}</strong>
-              <span>{responder.id}</span>
+              <span>{responder.responder_id}</span>
             </div>
 
             <span

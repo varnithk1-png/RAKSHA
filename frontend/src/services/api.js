@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export async function getRiskData() {
   const response = await fetch(`${API_BASE_URL}/risk`);
@@ -33,16 +34,13 @@ export async function getRoute(latitude, longitude) {
 }
 
 export async function sendAssistanceRequest(requestData) {
-  const response = await fetch(
-    `${API_BASE_URL}/assistance`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(requestData)
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/assistance`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestData),
+  });
 
   if (!response.ok) {
     throw new Error("Failed to send assistance request");

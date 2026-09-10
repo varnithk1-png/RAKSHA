@@ -35,12 +35,12 @@ function RiskPanel() {
 
         <div>
           <span>Population Exposure</span>
-          <strong>High</strong>
+          <strong>Demo</strong>
         </div>
 
         <div>
           <span>Building Vulnerability</span>
-          <strong>High</strong>
+          <strong>Demo</strong>
         </div>
 
       </div>
